@@ -3,7 +3,7 @@ Go Beanstalkd Client Library Forked From https://github.com/iwanbk/gobeanstalk. 
 
 #Install
 ```
-	github.com/ikool-cn/gobeanstalk-connection-pool
+	go get github.com/ikool-cn/gobeanstalk-connection-pool
 ```
 
 #Usage
@@ -113,7 +113,7 @@ Go Beanstalkd Client Library Forked From https://github.com/iwanbk/gobeanstalk. 
 	}
 ```
 
-#
+#Let's watch the connection
 ```
 telnet 10.0.0.101 11300
 stats
