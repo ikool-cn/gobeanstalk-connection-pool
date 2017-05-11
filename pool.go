@@ -17,6 +17,7 @@
 //		MaxIdle:     10,
 //		MaxActive:   100,
 //		IdleTimeout: 60 * time.Second,
+//		MaxLifetime: 180 * time.Second,
 //		Wait:        true,
 //	}
 //}
@@ -99,6 +100,10 @@ type Pool struct {
 	// is zero, then idle connections are not closed. Applications should set
 	// the timeout to a value less than the server's timeout.
 	IdleTimeout time.Duration
+
+	// Close connections after MaxLifetime for this duration. If the value
+	// is zero, then connections are not closed.
+	MaxLifetime time.Duration
 
 	// If Wait is true and the pool is at the MaxActive limit, then Get() waits
 	// for a connection to be returned to the pool before returning.
@@ -202,6 +207,17 @@ func (p *Pool) get() (*Conn, error) {
 				break
 			}
 			ic := e.Value.(idleConn)
+
+			//lifetime expired
+			if p.MaxLifetime > 0 && ic.c.createTime.Add(p.MaxLifetime).Before(nowFunc()) {
+				p.idle.Remove(e)
+				p.release()
+				p.mu.Unlock()
+				ic.c.Close()
+				p.mu.Lock()
+				continue
+			}
+
 			p.idle.Remove(e)
 			p.mu.Unlock()
 			return ic.c, nil
@@ -264,11 +280,14 @@ func (p *Pool) put(c *Conn, forceClose bool) error {
 
 	p.release()
 	p.mu.Unlock()
-	return c.Close()
+	err := c.Close()
+	//c = nil
+	return err
+
 }
 
 //Release a used connection, put back to idleList
-func (p *Pool) Release(c *Conn) error {
-	p.put(c, false)
+func (p *Pool) Release(c *Conn, forceClose bool) error {
+	p.put(c, forceClose)
 	return nil
 }

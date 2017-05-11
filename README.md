@@ -29,20 +29,20 @@ func main() {
 	defer pool.Close()
 
 	//Producer
-	ch := make(chan int, 10)
+	chProducer := make(chan int, 10)
 	for i := 1; i <= 10; i++ {
-		go Producer(pool, ch)
+		go Producer(pool, chProducer)
 	}
 
 	//Consumer
-	cch := make(chan int, 10)
+	chConsumer := make(chan int, 10)
 	for i := 1; i <= 10; i++ {
-		go Consumer(pool, cch)
+		go Consumer(pool, chConsumer)
 	}
 
 	for i := 1; i <= 10; i++ {
-		<-ch
-		<-cch
+		<-chProducer
+		<-chConsumer
 	}
 
 	fmt.Println("end...")
@@ -50,24 +50,25 @@ func main() {
 
 //Consumer
 func Consumer(pool *gobeanstalk.Pool, ch chan int) {
-	conn, err := pool.Get()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer pool.Release(conn)
-
-	conn.Watch(TEST_TUBE)
-	conn.Ignore(DEFAULT_TUBE)
 	for {
+		conn, err := pool.Get()
+		if err != nil {
+			log.Println(err)
+		}
+		conn.Watch(TEST_TUBE)
+		conn.Ignore(DEFAULT_TUBE)
 		job, err := conn.Reserve()
 		if err != nil {
-			log.Fatal(err)
+			pool.Release(conn, true)
+			log.Println(err)
 		}
 		fmt.Printf("[Consumer][%s] id:%d, body:%s\n", TEST_TUBE, job.ID, string(job.Body))
 		err = conn.Delete(job.ID)
 		if err != nil {
-			log.Fatal(err)
+			pool.Release(conn, true)
+			log.Println(err)
 		}
+		pool.Release(conn, false)
 	}
 	ch <- 1
 }
@@ -78,7 +79,7 @@ func Producer(pool *gobeanstalk.Pool, ch chan int) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer pool.Release(conn)
+	defer pool.Release(conn, false)
 
 	conn.Use(TEST_TUBE)
 	for i := 0; i < 10000; i++ {
@@ -107,6 +108,7 @@ func NewPool() *gobeanstalk.Pool {
 		MaxIdle:     10,
 		MaxActive:   100,
 		IdleTimeout: 60 * time.Second,
+		MaxLifetime: 180 * time.Second,
 		Wait:        true,
 	}
 }

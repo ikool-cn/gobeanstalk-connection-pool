@@ -42,6 +42,7 @@ type Conn struct {
 	addr      string
 	bufReader *bufio.Reader
 	bufWriter *bufio.Writer
+	createTime time.Time
 }
 
 // NewConn create a new connection
@@ -51,6 +52,7 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c.addr = addr
 	c.bufReader = bufio.NewReader(conn)
 	c.bufWriter = bufio.NewWriter(conn)
+	c.createTime = time.Now()
 
 	return c, nil
 }
